@@ -1,0 +1,96 @@
+name: ctf7-hm-flatter
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-hm-flatter.yml'
+      - 'ctf7/hm_flatter_solver.py'
+      - 'ctf7/hm-flatter-trigger-*'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  solve:
+    strategy:
+      fail-fast: false
+      max-parallel: 64
+      matrix:
+        d: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        group: [0, 1, 2, 3]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Singular and build flatter
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y singular libgmp-dev libmpfr-dev libfplll-dev libeigen3-dev libopenblas-dev cmake
+          git clone --depth=1 https://github.com/keeganryan/flatter.git /tmp/flatter-src
+          cmake -S /tmp/flatter-src -B /tmp/flatter-src/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/flatter-src/build -j"$(nproc)"
+          find /tmp/flatter-src/build -type f -name flatter -perm -111 -print -quit | xargs -I{} cp {} /tmp/flatter
+          /tmp/flatter -h | head || true
+          Singular --version | head || true
+      - name: Run centered Herrmann-May candidates
+        env:
+          D: ${{ matrix.d }}
+          GROUP: ${{ matrix.group }}
+        run: |
+          set +e
+          mkdir -p /tmp/work /tmp/result
+          start=$((GROUP * 4))
+          end=$((start + 4))
+          /usr/bin/time -v timeout --signal=TERM --kill-after=30s 20400 \
+            python3 -u ctf7/hm_flatter_solver.py "$D" /tmp/work /tmp/result/decoded.txt \
+              --flatter /tmp/flatter --singular Singular --params '22,6;23,7' \
+              --a-start "$start" --a-end "$end" \
+            > /tmp/result/solver.out 2> /tmp/result/solver.err
+          rc=$?
+          echo "solver_rc=$rc d=$D group=$GROUP start=$start end=$end" > /tmp/result/status.txt
+          cat /tmp/result/decoded.txt >> /tmp/result/status.txt || true
+          find /tmp/work -name '*.log' -maxdepth 2 -type f -exec sh -c 'echo --- $1; cat "$1"' _ {} \; \
+            >> /tmp/result/candidate-logs.txt 2>&1 || true
+          if grep -q '^status=VERIFIED' /tmp/result/decoded.txt; then cp /tmp/result/decoded.txt /tmp/result/SOLUTION.txt; fi
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hm-d${{ matrix.d }}-g${{ matrix.group }}
+          path: /tmp/result
+          retention-days: 3
+          if-no-files-found: warn
+
+  aggregate:
+    if: always()
+    needs: solve
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hm-d*-g*
+          path: /tmp/all
+      - name: Publish verified factors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p ctf7
+          grep -RInaE 'status=|solver_rc=|TRY |rows=|polys=|residue=|FLATTER_' /tmp/all > ctf7/hm-flatter-summary.txt || true
+          sol=$(find /tmp/all -name SOLUTION.txt -type f | head -1 || true)
+          if [ -n "$sol" ]; then cp "$sol" ctf7/solution.txt; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ctf7/hm-flatter-summary.txt ctf7/solution.txt 2>/dev/null || git add ctf7/hm-flatter-summary.txt
+          git commit -m 'Record Herrmann-May flatter results' || true
+          git push origin HEAD:ctf-rsa-partial-bits-solver || true
+          if [ -n "$sol" ]; then gh pr comment 1 --body-file "$sol" || true; fi
