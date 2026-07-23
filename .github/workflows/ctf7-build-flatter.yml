@@ -1,0 +1,34 @@
+name: ctf7-build-flatter
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-build-flatter.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build portable flatter bundle
+        run: |
+          sudo apt-get update -qq >/tmp/install.log 2>&1
+          sudo apt-get install -qq -y --no-install-recommends git cmake g++ make libgmp-dev libmpfr-dev libfplll-dev libeigen3-dev libopenblas-dev >>/tmp/install.log 2>&1
+          git clone -q --depth=1 https://github.com/keeganryan/flatter /tmp/flatter-src
+          cmake -S /tmp/flatter-src -B /tmp/flatter-src/build -DCMAKE_BUILD_TYPE=Release >/tmp/build.log 2>&1
+          cmake --build /tmp/flatter-src/build -j2 >>/tmp/build.log 2>&1
+          sudo cmake --install /tmp/flatter-src/build >>/tmp/build.log 2>&1
+          sudo ldconfig
+          mkdir -p /tmp/flatter-bundle/bin /tmp/flatter-bundle/lib
+          cp /usr/local/bin/flatter /tmp/flatter-bundle/bin/
+          cp -a /usr/local/lib/libflatter.so* /tmp/flatter-bundle/lib/
+          ldd /usr/local/bin/flatter | tee /tmp/flatter-bundle/ldd.txt
+          tar -C /tmp -czf /tmp/flatter-bundle.tar.gz flatter-bundle
+      - name: Upload flatter bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatter-linux-x86_64
+          path: /tmp/flatter-bundle.tar.gz
+          retention-days: 2
