@@ -1,23 +1,103 @@
 RUN_ID=30018431905
-{"conclusion":null,"created_at":"2026-07-23T14:59:42Z","status":"in_progress","updated_at":"2026-07-23T15:02:29Z"}
+{"conclusion":"success","created_at":"2026-07-23T14:59:42Z","status":"completed","updated_at":"2026-07-23T20:17:11Z"}
 --- jobs ---
-solve (2)	in_progress		89244501675
-solve (9)	in_progress		89244501691
-solve (5)	in_progress		89244501702
-solve (12)	in_progress		89244501707
-solve (8)	in_progress		89244501736
-solve (7)	in_progress		89244501737
-solve (1)	in_progress		89244501741
-solve (6)	in_progress		89244501743
-solve (13)	in_progress		89244501746
-solve (15)	in_progress		89244501747
-solve (4)	in_progress		89244501759
-solve (0)	in_progress		89244501766
-solve (10)	in_progress		89244501800
-solve (11)	in_progress		89244501951
-solve (14)	in_progress		89244502013
-solve (3)	in_progress		89244502029
+solve (2)	completed	success	89244501675
+solve (9)	completed	success	89244501691
+solve (5)	completed	success	89244501702
+solve (12)	completed	success	89244501707
+solve (8)	completed	success	89244501736
+solve (7)	completed	success	89244501737
+solve (1)	completed	success	89244501741
+solve (6)	completed	success	89244501743
+solve (13)	completed	success	89244501746
+solve (15)	completed	success	89244501747
+solve (4)	completed	success	89244501759
+solve (0)	completed	success	89244501766
+solve (10)	completed	success	89244501800
+solve (11)	completed	success	89244501951
+solve (14)	completed	success	89244502013
+solve (3)	completed	success	89244502029
 --- artifacts ---
+8577359839	ctf7-sat-d14	false	101821
+8577359059	ctf7-sat-d9	false	103699
+8577356660	ctf7-sat-d8	false	107452
+8577356481	ctf7-sat-d0	false	102252
+8577356114	ctf7-sat-d11	false	104933
+8577355134	ctf7-sat-d4	false	104691
+8577353884	ctf7-sat-d5	false	103133
+8577353779	ctf7-sat-d1	false	91586
+8577353744	ctf7-sat-d7	false	100612
+8577353117	ctf7-sat-d3	false	92090
+8577352990	ctf7-sat-d13	false	102060
+8577352914	ctf7-sat-d2	false	100977
+8577352833	ctf7-sat-d6	false	106724
+8577352608	ctf7-sat-d15	false	114655
+8577352442	ctf7-sat-d10	false	113958
+8577350901	ctf7-sat-d12	false	133942
+/tmp/ctf7-results/artifacts/ctf7-sat-d0/d0.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d1/d1.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d10/d10.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d11/d11.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d12/d12.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d13/d13.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d14/d14.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d15/d15.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d2/d2.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d3/d3.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d4/d4.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d5/d5.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d6/d6.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d7/d7.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d8/d8.log
+/tmp/ctf7-results/artifacts/ctf7-sat-d9/d9.log
 /tmp/ctf7-results/files.txt
 /tmp/ctf7-results/status.txt
 --- candidate output matches ---
+/tmp/ctf7-results/artifacts/ctf7-sat-d6/d6.log:5434:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d6/d6.log:5498:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d6/d6.log:5503:	Command being timed: "python3 ctf7/sat_factor.py --d 6 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d6"
+/tmp/ctf7-results/artifacts/ctf7-sat-d9/d9.log:5332:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d9/d9.log:5396:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d9/d9.log:5401:	Command being timed: "python3 ctf7/sat_factor.py --d 9 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d9"
+/tmp/ctf7-results/artifacts/ctf7-sat-d8/d8.log:5471:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d8/d8.log:5535:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d8/d8.log:5540:	Command being timed: "python3 ctf7/sat_factor.py --d 8 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d8"
+/tmp/ctf7-results/artifacts/ctf7-sat-d1/d1.log:4719:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d1/d1.log:4783:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d1/d1.log:4788:	Command being timed: "python3 ctf7/sat_factor.py --d 1 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d1"
+/tmp/ctf7-results/artifacts/ctf7-sat-d14/d14.log:5234:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d14/d14.log:5298:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d14/d14.log:5303:	Command being timed: "python3 ctf7/sat_factor.py --d 14 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d14"
+/tmp/ctf7-results/artifacts/ctf7-sat-d4/d4.log:5367:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d4/d4.log:5431:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d4/d4.log:5436:	Command being timed: "python3 ctf7/sat_factor.py --d 4 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d4"
+/tmp/ctf7-results/artifacts/ctf7-sat-d3/d3.log:4733:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d3/d3.log:4796:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d3/d3.log:4801:	Command being timed: "python3 ctf7/sat_factor.py --d 3 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d3"
+/tmp/ctf7-results/artifacts/ctf7-sat-d7/d7.log:5122:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d7/d7.log:5185:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d7/d7.log:5190:	Command being timed: "python3 ctf7/sat_factor.py --d 7 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d7"
+/tmp/ctf7-results/artifacts/ctf7-sat-d12/d12.log:6767:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d12/d12.log:6831:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d12/d12.log:6836:	Command being timed: "python3 ctf7/sat_factor.py --d 12 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d12"
+/tmp/ctf7-results/artifacts/ctf7-sat-d13/d13.log:5237:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d13/d13.log:5301:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d13/d13.log:5306:	Command being timed: "python3 ctf7/sat_factor.py --d 13 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d13"
+/tmp/ctf7-results/artifacts/ctf7-sat-d15/d15.log:5898:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d15/d15.log:5962:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d15/d15.log:5967:	Command being timed: "python3 ctf7/sat_factor.py --d 15 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d15"
+/tmp/ctf7-results/artifacts/ctf7-sat-d0/d0.log:5245:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d0/d0.log:5309:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d0/d0.log:5314:	Command being timed: "python3 ctf7/sat_factor.py --d 0 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d0"
+/tmp/ctf7-results/artifacts/ctf7-sat-d5/d5.log:5284:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d5/d5.log:5348:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d5/d5.log:5353:	Command being timed: "python3 ctf7/sat_factor.py --d 5 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d5"
+/tmp/ctf7-results/artifacts/ctf7-sat-d11/d11.log:5393:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d11/d11.log:5457:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d11/d11.log:5462:	Command being timed: "python3 ctf7/sat_factor.py --d 11 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d11"
+/tmp/ctf7-results/artifacts/ctf7-sat-d10/d10.log:5799:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d10/d10.log:5863:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d10/d10.log:5868:	Command being timed: "python3 ctf7/sat_factor.py --d 10 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d10"
+/tmp/ctf7-results/artifacts/ctf7-sat-d2/d2.log:5155:c caught signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d2/d2.log:5219:c raising signal 15 (SIGTERM)
+/tmp/ctf7-results/artifacts/ctf7-sat-d2/d2.log:5224:	Command being timed: "python3 ctf7/sat_factor.py --d 2 --solver /tmp/kissat/build/kissat --timeout 19000 --work /tmp/ctf7-sat/d2"
