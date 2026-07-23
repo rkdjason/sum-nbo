@@ -1,0 +1,76 @@
+name: ctf7-sat2-monitor
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-sat2-monitor.yml'
+      - 'ctf7/sat2-monitor-trigger-*'
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - name: Poll SAT2 artifacts and publish immediately
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          mkdir -p /tmp/seen /tmp/downloads ctf7
+          run_id=""
+          for _ in $(seq 1 60); do
+            run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ctf7-sat2.yml/runs?branch=ctf-rsa-partial-bits-solver&per_page=20" \
+              --jq '[.workflow_runs[] | select(.event=="pull_request")][0].id' 2>/dev/null || true)
+            [ -n "$run_id" ] && [ "$run_id" != "null" ] && break
+            sleep 10
+          done
+          echo "monitoring run_id=$run_id" | tee ctf7/sat2-monitor.txt
+          [ -n "$run_id" ] || exit 0
+          for round in $(seq 1 340); do
+            echo "round=$round $(date -u +%FT%TZ)" | tee -a ctf7/sat2-monitor.txt
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '[.status,.conclusion,.updated_at] | @tsv' \
+              >> ctf7/sat2-monitor.txt 2>/dev/null || true
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+              --jq '.artifacts[] | [.id,.name] | @tsv' 2>/dev/null > /tmp/artifacts.tsv || true
+            while IFS=$'\t' read -r aid aname; do
+              [ -n "$aid" ] || continue
+              [ -e "/tmp/seen/$aid" ] && continue
+              touch "/tmp/seen/$aid"
+              mkdir -p "/tmp/downloads/$aid"
+              gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${aid}/zip" > "/tmp/downloads/$aid.zip" || continue
+              unzip -oq "/tmp/downloads/$aid.zip" -d "/tmp/downloads/$aid" || true
+              sol=$(find "/tmp/downloads/$aid" -name SOLUTION.txt -type f | head -1 || true)
+              if [ -n "$sol" ] && grep -q '^status=VERIFIED' "$sol"; then
+                cp "$sol" ctf7/solution.txt
+                echo "FOUND artifact=$aid name=$aname" | tee -a ctf7/sat2-monitor.txt
+                git config user.name github-actions
+                git config user.email github-actions@github.com
+                git add ctf7/solution.txt ctf7/sat2-monitor.txt
+                git commit -m 'Publish verified CTF7 factors from SAT2'
+                git push origin HEAD:ctf-rsa-partial-bits-solver
+                gh pr comment 1 --body-file ctf7/solution.txt || true
+                exit 0
+              fi
+            done < /tmp/artifacts.tsv
+            status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.status' 2>/dev/null || true)
+            if [ "$status" = "completed" ]; then
+              echo COMPLETED_WITHOUT_EARLY_SOLUTION | tee -a ctf7/sat2-monitor.txt
+              break
+            fi
+            sleep 60
+          done
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ctf7/sat2-monitor.txt
+          git commit -m 'Record SAT2 monitor status' || true
+          git push origin HEAD:ctf-rsa-partial-bits-solver || true
