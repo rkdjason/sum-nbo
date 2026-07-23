@@ -1,0 +1,119 @@
+name: ctf7-sat2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-sat2.yml'
+      - 'ctf7/sat_gen2.cpp'
+      - 'ctf7/decode_sat2.py'
+      - 'ctf7/sat2-trigger-*'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  solve:
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        d: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build optimized generator and Kissat
+        run: |
+          set -euxo pipefail
+          g++ -std=c++17 -O3 -march=native -DNDEBUG ctf7/sat_gen2.cpp -o /tmp/sat_gen2
+          git clone --depth=1 https://github.com/arminbiere/kissat.git /tmp/kissat-src
+          cd /tmp/kissat-src
+          ./configure --competition
+          make -j"$(nproc)"
+          cp build/kissat /tmp/kissat
+          /tmp/kissat --version
+      - name: Generate candidate CNF
+        env:
+          D: ${{ matrix.d }}
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/work /tmp/result
+          /usr/bin/time -v /tmp/sat_gen2 "$D" /tmp/work/problem.cnf /tmp/work/problem.meta /tmp/work/clauses.tmp \
+            2>&1 | tee /tmp/result/generate.log
+          rm -f /tmp/work/clauses.tmp
+          ls -lh /tmp/work/problem.cnf /tmp/work/problem.meta | tee -a /tmp/result/generate.log
+          cp /tmp/work/problem.meta /tmp/result/
+      - name: Solve
+        env:
+          D: ${{ matrix.d }}
+        run: |
+          set +e
+          /usr/bin/time -v timeout --signal=TERM --kill-after=30s 19800 \
+            /tmp/kissat --quiet --seed=$((D + 1)) /tmp/work/problem.cnf \
+            > /tmp/result/solver.out 2> /tmp/result/solver.err
+          rc=$?
+          echo "solver_rc=$rc" | tee /tmp/result/status.txt
+          tail -200 /tmp/result/solver.out >> /tmp/result/status.txt || true
+          tail -200 /tmp/result/solver.err >> /tmp/result/status.txt || true
+          python3 ctf7/decode_sat2.py /tmp/work/problem.meta /tmp/result/solver.out /tmp/result/decoded.txt
+          dec_rc=$?
+          echo "decode_rc=$dec_rc" >> /tmp/result/status.txt
+          cat /tmp/result/decoded.txt >> /tmp/result/status.txt || true
+          if grep -q '^status=VERIFIED' /tmp/result/decoded.txt; then
+            cp /tmp/result/decoded.txt /tmp/result/SOLUTION.txt
+          fi
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sat2-d${{ matrix.d }}
+          path: /tmp/result
+          retention-days: 3
+          if-no-files-found: warn
+
+  aggregate:
+    if: always()
+    needs: solve
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sat2-d*
+          path: /tmp/all
+          merge-multiple: false
+      - name: Verify and publish result
+        run: |
+          set -euxo pipefail
+          mkdir -p ctf7
+          find /tmp/all -type f -maxdepth 4 -print | sort > ctf7/sat2-files.txt
+          grep -RInaE 'status=|solver_rc=|decode_rc=|common_high=|vars=|clauses=' /tmp/all \
+            > ctf7/sat2-summary.txt || true
+          sol=$(find /tmp/all -name SOLUTION.txt -type f | head -1 || true)
+          if [ -n "$sol" ]; then
+            cp "$sol" ctf7/solution.txt
+            echo VERIFIED_SOLUTION_FOUND >> ctf7/sat2-summary.txt
+          else
+            echo NO_VERIFIED_SOLUTION_IN_THIS_RUN >> ctf7/sat2-summary.txt
+          fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ctf7/sat2-files.txt ctf7/sat2-summary.txt ctf7/solution.txt 2>/dev/null || git add ctf7/sat2-files.txt ctf7/sat2-summary.txt
+          git commit -m 'Record optimized SAT2 results' || true
+          git push origin HEAD:ctf-rsa-partial-bits-solver || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sat2-aggregate
+          path: |
+            ctf7/sat2-summary.txt
+            ctf7/solution.txt
+          retention-days: 3
+          if-no-files-found: warn
