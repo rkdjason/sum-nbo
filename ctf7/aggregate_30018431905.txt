@@ -1,0 +1,23 @@
+RUN_ID=30018431905
+{"conclusion":null,"created_at":"2026-07-23T14:59:42Z","status":"in_progress","updated_at":"2026-07-23T15:02:29Z"}
+--- jobs ---
+solve (2)	in_progress		89244501675
+solve (9)	in_progress		89244501691
+solve (5)	in_progress		89244501702
+solve (12)	in_progress		89244501707
+solve (8)	in_progress		89244501736
+solve (7)	in_progress		89244501737
+solve (1)	in_progress		89244501741
+solve (6)	in_progress		89244501743
+solve (13)	in_progress		89244501746
+solve (15)	in_progress		89244501747
+solve (4)	in_progress		89244501759
+solve (0)	in_progress		89244501766
+solve (10)	in_progress		89244501800
+solve (11)	in_progress		89244501951
+solve (14)	in_progress		89244502013
+solve (3)	in_progress		89244502029
+--- artifacts ---
+/tmp/ctf7-results/files.txt
+/tmp/ctf7-results/status.txt
+--- candidate output matches ---
