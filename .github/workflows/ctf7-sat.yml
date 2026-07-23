@@ -1,0 +1,55 @@
+name: ctf7-sat
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ctf7/challenge.py'
+      - 'ctf7/satlib.py'
+      - 'ctf7/sat_factor.py'
+      - '.github/workflows/ctf7-sat.yml'
+
+jobs:
+  solve:
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        d: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Kissat
+        run: |
+          git clone -q --depth=1 https://github.com/arminbiere/kissat /tmp/kissat
+          cd /tmp/kissat
+          ./configure >/tmp/kissat-build.log 2>&1
+          make -j2 >>/tmp/kissat-build.log 2>&1
+          test -x /tmp/kissat/build/kissat
+      - name: Solve fixed high-hole candidate
+        env:
+          D: ${{ matrix.d }}
+        run: |
+          set +e
+          mkdir -p /tmp/ctf7-sat
+          /usr/bin/time -v python3 ctf7/sat_factor.py \
+            --d "$D" \
+            --solver /tmp/kissat/build/kissat \
+            --timeout 19000 \
+            --work "/tmp/ctf7-sat/d${D}" \
+            2>&1 | tee "/tmp/ctf7-sat/d${D}.log"
+          status=${PIPESTATUS[0]}
+          echo "PYTHON_STATUS=$status" | tee -a "/tmp/ctf7-sat/d${D}.log"
+          grep -E 'CNF_META|SOLVER_EXIT|NO_SAT|MODEL_|FOUND_|PLAINTEXT_|Elapsed|Maximum resident|PYTHON_STATUS' "/tmp/ctf7-sat/d${D}.log" || true
+          exit 0
+      - name: Upload solver output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctf7-sat-d${{ matrix.d }}
+          path: |
+            /tmp/ctf7-sat/d${{ matrix.d }}.log
+            /tmp/ctf7-sat/d${{ matrix.d }}/FOUND.txt
+          if-no-files-found: warn
+          retention-days: 2
