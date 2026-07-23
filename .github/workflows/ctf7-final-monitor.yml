@@ -1,0 +1,60 @@
+name: ctf7-final-monitor
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-final-monitor.yml'
+      - 'ctf7/final-monitor-trigger-*'
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - name: Poll final SAT and lattice artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          mkdir -p /tmp/seen /tmp/downloads ctf7
+          echo "started $(date -u +%FT%TZ)" > ctf7/final-monitor.txt
+          for round in $(seq 1 340); do
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.expired==false) | [.id,.name,.workflow_run.id] | @tsv' \
+              > /tmp/artifacts.tsv 2>/dev/null || true
+            while IFS=$'\t' read -r aid aname runid; do
+              case "$aname" in
+                sat-dir-hints-d*|hm-d*-g*) ;;
+                *) continue ;;
+              esac
+              [ -e "/tmp/seen/$aid" ] && continue
+              touch "/tmp/seen/$aid"
+              mkdir -p "/tmp/downloads/$aid"
+              gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${aid}/zip" > "/tmp/downloads/$aid.zip" || continue
+              unzip -oq "/tmp/downloads/$aid.zip" -d "/tmp/downloads/$aid" || true
+              sol=$(find "/tmp/downloads/$aid" -name SOLUTION.txt -type f | head -1 || true)
+              if [ -n "$sol" ] && grep -q '^status=VERIFIED' "$sol"; then
+                cp "$sol" ctf7/solution.txt
+                echo "FOUND artifact=$aid name=$aname run=$runid" >> ctf7/final-monitor.txt
+                git config user.name github-actions
+                git config user.email github-actions@github.com
+                git add ctf7/solution.txt ctf7/final-monitor.txt
+                git commit -m 'Publish verified RSA factors'
+                git push origin HEAD:ctf-rsa-partial-bits-solver
+                gh pr comment 1 --body-file ctf7/solution.txt || true
+                exit 0
+              fi
+            done < /tmp/artifacts.tsv
+            echo "round=$round $(date -u +%FT%TZ)" >> ctf7/final-monitor.txt
+            sleep 60
+          done
