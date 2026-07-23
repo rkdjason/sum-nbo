@@ -1,0 +1,44 @@
+name: ctf7-prioritize-latest
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-prioritize-latest.yml'
+      - 'ctf7/prioritize-latest-trigger-*'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  prioritize:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Keep newest run of each final portfolio
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -u
+          sleep 45
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status=="queued" or .status=="in_progress") | [.id,.name,.created_at,.status] | @tsv' \
+            > /tmp/runs.tsv
+          declare -A seen
+          while IFS=$'\t' read -r id name created status; do
+            case "$name" in
+              ctf7-hm-newton|ctf7-sat-dir-hints|ctf7-final-monitor)
+                if [ -z "${seen[$name]+x}" ]; then
+                  seen[$name]=1; echo "keeping newest $id $name $created $status"
+                else
+                  echo "cancelling older $id $name $created $status"
+                  gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/cancel" || true
+                fi ;;
+              ctf7-universal-monitor|ctf7-cubes-monitor|ctf7-prioritize-latest)
+                echo "keeping $id $name $status" ;;
+              ctf7-*)
+                echo "cancelling $id $name $status"
+                gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/cancel" || true ;;
+            esac
+          done < /tmp/runs.tsv
