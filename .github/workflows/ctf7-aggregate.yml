@@ -1,0 +1,56 @@
+name: ctf7-aggregate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-aggregate.yml'
+      - 'ctf7/aggregate-trigger-*'
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - name: Download and inspect SAT run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: '30018431905'
+        run: |
+          set -uo pipefail
+          mkdir -p /tmp/ctf7-results
+          {
+            echo "RUN_ID=$RUN_ID"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq '{status,conclusion,created_at,updated_at}' || true
+            echo '--- jobs ---'
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100" --jq '.jobs[] | [.name,.status,.conclusion,.id] | @tsv' || true
+            echo '--- artifacts ---'
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" --jq '.artifacts[] | [.id,.name,.expired,.size_in_bytes] | @tsv' || true
+          } | tee /tmp/ctf7-results/status.txt
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --dir /tmp/ctf7-results/artifacts || true
+          find /tmp/ctf7-results -maxdepth 5 -type f -print | sort > /tmp/ctf7-results/files.txt
+          {
+            echo '--- candidate output matches ---'
+            grep -RInaE 'FOUND|FACTOR|^p[ =:]|^q[ =:]|VERIFY|SATISFIABLE|UNSATISFIABLE|UNKNOWN|timeout|TIMEOUT|signal' /tmp/ctf7-results/artifacts 2>/dev/null || true
+          } | tee /tmp/ctf7-results/matches.txt
+          cat /tmp/ctf7-results/status.txt /tmp/ctf7-results/files.txt /tmp/ctf7-results/matches.txt > ctf7/aggregate_30018431905.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ctf7/aggregate_30018431905.txt
+          git commit -m 'Aggregate CTF7 SAT results' || true
+          git push origin HEAD:ctf-rsa-partial-bits-solver || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ctf7-aggregate-30018431905
+          path: /tmp/ctf7-results
+          if-no-files-found: warn
+          retention-days: 2
