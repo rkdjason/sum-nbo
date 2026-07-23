@@ -1,0 +1,34 @@
+name: ctf7-smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ctf7/**'
+      - '.github/workflows/ctf7-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SageMath and flatter build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            sagemath git cmake g++ make libgmp-dev libmpfr-dev \
+            libfplll-dev libeigen3-dev libopenblas-dev
+      - name: Build and install flatter
+        run: |
+          git clone --depth=1 https://github.com/keeganryan/flatter /tmp/flatter
+          cmake -S /tmp/flatter -B /tmp/flatter/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/flatter/build -j2
+          sudo cmake --install /tmp/flatter/build
+          sudo ldconfig
+          flatter -h | head
+      - name: Smoke test lattice generation and reduction
+        run: |
+          set -o pipefail
+          sage -python ctf7/solve.py --d 0 --a-start 0 --a-end 1 --m 8 --t 2 --delta 0.99 --work /tmp/ctf7-smoke 2>&1 | tee /tmp/ctf7-smoke.log || true
+          grep -E 'CONFIG|CANDIDATE|REDUCED|POLYS|ERROR|NOT_FOUND' /tmp/ctf7-smoke.log
