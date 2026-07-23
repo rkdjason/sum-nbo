@@ -1,0 +1,113 @@
+name: ctf7-hm-fast
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-hm-fast.yml'
+      - 'ctf7/hm_newton_solver.py'
+      - 'ctf7/hm_newton_prefilter.py'
+      - 'ctf7/hm-fast-trigger-*'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  solve:
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        d: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies and build flatter
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y singular libgmp-dev libmpfr-dev libfplll-dev libeigen3-dev libopenblas-dev cmake
+          python3 -m pip install --disable-pip-version-check mpmath
+          git clone --depth=1 https://github.com/keeganryan/flatter.git /tmp/flatter-src
+          cmake -S /tmp/flatter-src -B /tmp/flatter-src/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/flatter-src/build -j"$(nproc)"
+          find /tmp/flatter-src/build -type f -name flatter -perm -111 -print -quit | xargs -I{} cp {} /tmp/flatter
+      - name: Cover all low-hole candidates with the 351-dimensional lattice
+        env:
+          D: ${{ matrix.d }}
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        shell: bash
+        run: |
+          set +e
+          mkdir -p /tmp/result
+          run_one() {
+            a="$1"; wd="/tmp/work-a${a}"; rd="/tmp/result/a${a}"
+            mkdir -p "$wd" "$rd"
+            PYTHONPATH=ctf7 timeout --signal=TERM --kill-after=30s 19800 \
+              python3 -u ctf7/hm_newton_prefilter.py "$D" "$wd" "$rd/decoded.txt" \
+                --flatter /tmp/flatter --singular Singular --m 25 --t 7 \
+                --a-start "$a" --a-end "$((a+1))" \
+              > "$rd/solver.out" 2> "$rd/solver.err"
+            rc=$?
+            echo "solver_rc=$rc d=$D a=$a" > "$rd/status.txt"
+            cat "$rd/decoded.txt" >> "$rd/status.txt" || true
+            find "$wd" -name '*.log' -type f -exec sh -c 'echo --- $1; cat "$1"' _ {} \; \
+              > "$rd/candidate-logs.txt" 2>&1 || true
+            if grep -q '^status=VERIFIED' "$rd/decoded.txt"; then
+              flock /tmp/solution.lock cp "$rd/decoded.txt" /tmp/result/SOLUTION.txt
+            fi
+          }
+          export -f run_one
+          for base in 0 2 4 6 8 10 12 14; do
+            run_one "$base" & p1=$!
+            run_one "$((base+1))" & p2=$!
+            while kill -0 "$p1" 2>/dev/null || kill -0 "$p2" 2>/dev/null; do
+              if [ -f /tmp/result/SOLUTION.txt ]; then kill "$p1" "$p2" 2>/dev/null || true; break; fi
+              sleep 5
+            done
+            wait "$p1" 2>/dev/null || true; wait "$p2" 2>/dev/null || true
+            [ -f /tmp/result/SOLUTION.txt ] && break
+          done
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hm-fast-d${{ matrix.d }}
+          path: /tmp/result
+          retention-days: 3
+          if-no-files-found: warn
+
+  aggregate:
+    if: always()
+    needs: solve
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hm-fast-d*
+          path: /tmp/all
+      - name: Publish verified factors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p ctf7
+          grep -RInaE 'status=|solver_rc=|TRY |rows=|polys=|PREFILTER|NEWTON_|residue=|FLATTER_' /tmp/all > ctf7/hm-fast-summary.txt || true
+          sol=$(find /tmp/all -name SOLUTION.txt -type f | head -1 || true)
+          if [ -n "$sol" ]; then cp "$sol" ctf7/solution.txt; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ctf7/hm-fast-summary.txt ctf7/solution.txt 2>/dev/null || git add ctf7/hm-fast-summary.txt
+          git commit -m 'Record fast Herrmann-May results' || true
+          git push origin HEAD:ctf-rsa-partial-bits-solver || true
+          if [ -n "$sol" ]; then gh pr comment 1 --body-file "$sol" || true; fi
