@@ -1,0 +1,125 @@
+name: ctf7-sat-dir-cubes
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ctf7-sat-dir-cubes.yml'
+      - 'ctf7/sat-dir-cubes-trigger-*'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  solve:
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        d: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build directional encoder and Kissat
+        run: |
+          set -euxo pipefail
+          g++ -std=c++17 -O3 -march=native -DNDEBUG -Ictf7 ctf7/sat_dir.cpp -o /tmp/sat_dir
+          git clone --depth=1 https://github.com/arminbiere/kissat.git /tmp/kissat-src
+          cd /tmp/kissat-src
+          ./configure --competition
+          make -j"$(nproc)"
+          cp build/kissat /tmp/kissat
+      - name: Generate once and solve 16 low-hole cubes
+        env:
+          D: ${{ matrix.d }}
+        shell: bash
+        run: |
+          set +e
+          mkdir -p /tmp/work /tmp/result
+          /usr/bin/time -v /tmp/sat_dir "$D" /tmp/work/problem.cnf /tmp/work/problem.meta /tmp/work/clauses.tmp \
+            > /tmp/result/generate.stdout 2> /tmp/result/generate.stderr
+          gen_rc=$?
+          rm -f /tmp/work/clauses.tmp
+          echo "gen_rc=$gen_rc" > /tmp/result/status.txt
+          [ "$gen_rc" -eq 0 ] || exit 0
+          cp /tmp/work/problem.meta /tmp/result/
+          read -r tag fmt vars clauses < /tmp/work/problem.cnf
+          newclauses=$((clauses + 1))
+          run_a() {
+            a="$1"
+            out="/tmp/result/a${a}.out"
+            err="/tmp/result/a${a}.err"
+            {
+              echo "p cnf $vars $newclauses"
+              tail -n +2 /tmp/work/problem.cnf
+              echo "$((a + 1)) 0"
+            } | timeout --signal=TERM --kill-after=20s 4500 \
+                  /tmp/kissat --quiet --seed=$((1000 + D*16 + a)) \
+                  >"$out" 2>"$err"
+            rc=$?
+            echo "a=$a rc=$rc" >> /tmp/result/status.txt
+            python3 ctf7/decode_sat2.py /tmp/work/problem.meta "$out" "/tmp/result/a${a}.decoded" >/dev/null 2>&1
+            if grep -q '^status=VERIFIED' "/tmp/result/a${a}.decoded" 2>/dev/null; then
+              cp "/tmp/result/a${a}.decoded" /tmp/result/SOLUTION.txt
+            fi
+          }
+          export -f run_a
+          export D vars newclauses
+          for base in 0 4 8 12; do
+            pids=()
+            for off in 0 1 2 3; do
+              a=$((base + off))
+              run_a "$a" & pids+=("$!")
+            done
+            while :; do
+              wait -n 2>/dev/null
+              if [ -f /tmp/result/SOLUTION.txt ]; then
+                for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
+                wait 2>/dev/null || true
+                exit 0
+              fi
+              alive=0
+              for pid in "${pids[@]}"; do kill -0 "$pid" 2>/dev/null && alive=1; done
+              [ "$alive" -eq 0 ] && break
+            done
+          done
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sat-dir-cubes-d${{ matrix.d }}
+          path: /tmp/result
+          retention-days: 3
+          if-no-files-found: warn
+
+  aggregate:
+    if: always()
+    needs: solve
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ctf-rsa-partial-bits-solver
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sat-dir-cubes-d*
+          path: /tmp/all
+      - name: Publish verified result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p ctf7
+          grep -RInaE 'status=| rc=|common_high=|vars=|clauses=|gen_rc=' /tmp/all > ctf7/sat-dir-cubes-summary.txt || true
+          sol=$(find /tmp/all -name SOLUTION.txt -type f | head -1 || true)
+          if [ -n "$sol" ]; then cp "$sol" ctf7/solution.txt; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add ctf7/sat-dir-cubes-summary.txt ctf7/solution.txt 2>/dev/null || git add ctf7/sat-dir-cubes-summary.txt
+          git commit -m 'Record directional cube SAT results' || true
+          git push origin HEAD:ctf-rsa-partial-bits-solver || true
+          if [ -n "$sol" ]; then gh pr comment 1 --body-file "$sol" || true; fi
